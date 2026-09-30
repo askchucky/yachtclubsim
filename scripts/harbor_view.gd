@@ -149,33 +149,21 @@ func apply_boats(sim_state: YearSim) -> void:
 		boat_root.add_child(sprite)
 		tied.append({"sprite": sprite, "base": sprite.position.y, "phase": float(i)})
 	var moving := sim.moving_count()
-	if moving <= 0:
+	if moving <= 0 or not catalog["paths"].has("loop"):
 		return
-	var order := ["loop", "weave", "in", "out"]
-	var keys: Array = []
-	for key in order:
-		if catalog["paths"].has(key):
-			keys.append(key)
-	if keys.is_empty():
+	var path := _path(catalog["paths"]["loop"])
+	var length := path.curve.get_baked_length()
+	if length < 2.0:
 		return
-	var paths := {}
-	var per := {}
-	for key in keys:
-		paths[key] = _path(catalog["paths"][key])
-		per[key] = 0
+	# Even gaps along the whole circuit. A few tenths of a pixel per
+	# second is enough variation to see, and not enough to close a gap.
+	var spacing := length / float(moving)
 	for i in moving:
-		per[keys[i % keys.size()]] += 1
-	var seen := {}
-	for key in keys:
-		seen[key] = 0
-	for i in moving:
-		var key: String = str(keys[i % keys.size()])
-		var slot: int = int(seen[key])
-		seen[key] = slot + 1
 		var boat := HarborBoat.new()
 		boat.cell = cell
 		boat.col = i % kinds
 		boat.sheet = sheets["boats"]
+		boat.rotates = false
 		boat.sprite = _boat_sprite(boat.col, 0, cell)
 		boat.sprite.position = Vector2.ZERO
 		boat.add_child(boat.sprite)
@@ -184,10 +172,10 @@ func apply_boats(sim_state: YearSim) -> void:
 		boat.wake.centered = true
 		boat.wake.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		boat.add_child(boat.wake)
-		boat.pace = 20.0 + float((i * 3) % 5) * 3.0
+		boat.pace = 22.0 + float(i % 3) * 0.1
 		boat.moving = true
-		paths[key].add_child(boat)
-		boat.progress_ratio = (float(slot) + 0.5) / float(maxi(1, int(per[key])))
+		path.add_child(boat)
+		boat.progress = spacing * (float(i) + 0.5)
 
 
 func pop_moods() -> void:

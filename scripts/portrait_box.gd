@@ -1,7 +1,7 @@
 class_name PortraitBox
 extends PanelContainer
 
-var flag_box := VBoxContainer.new()
+var flag_box := HBoxContainer.new()
 var body := PixelLabel.new()
 var face := TextureRect.new()
 var die_view := TextureRect.new()
@@ -35,27 +35,29 @@ func _ready() -> void:
 	face_names = names["faces"]
 	add_theme_stylebox_override("panel", UiSkin.frame(false))
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 4)
+	box.add_theme_constant_override("separation", 2)
 	add_child(box)
-	var top := HBoxContainer.new()
-	top.add_theme_constant_override("separation", 8)
-	box.add_child(top)
-	face.custom_minimum_size = Vector2(40, 40)
+	flag_box.add_theme_constant_override("separation", 8)
+	box.add_child(flag_box)
+	var speech := HBoxContainer.new()
+	speech.add_theme_constant_override("separation", 6)
+	box.add_child(speech)
+	face.custom_minimum_size = Vector2(16, 16)
+	face.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	face.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	face.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	face.texture = _face_tex("commodore")
-	top.add_child(face)
-	die_view.custom_minimum_size = Vector2(32, 32)
+	speech.add_child(face)
+	die_view.custom_minimum_size = Vector2(16, 16)
+	die_view.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	die_view.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	die_view.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	die_view.visible = false
-	top.add_child(die_view)
-	flag_box.add_theme_constant_override("separation", 0)
-	top.add_child(flag_box)
+	speech.add_child(die_view)
 	body.scale_px = 2
-	body.wrap_width = 490
-	body.custom_minimum_size = Vector2(490, 32)
-	box.add_child(body)
+	body.wrap_width = 660
+	body.custom_minimum_size = Vector2(640, 16)
+	speech.add_child(body)
 
 
 func refresh(sim: YearSim) -> void:
@@ -91,16 +93,16 @@ func set_die(face_index: int) -> void:
 
 func _flag_row(id: String, mood: int) -> HBoxContainer:
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 6)
+	row.add_theme_constant_override("separation", 2)
 	var face_mark := TextureRect.new()
-	face_mark.custom_minimum_size = Vector2(22, 22)
+	face_mark.custom_minimum_size = Vector2(16, 16)
 	face_mark.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	face_mark.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	face_mark.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	face_mark.texture = _face_tex(id)
 	row.add_child(face_mark)
 	var mark := TextureRect.new()
-	mark.custom_minimum_size = Vector2(24, 24)
+	mark.custom_minimum_size = Vector2(16, 16)
 	mark.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	mark.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	mark.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -108,7 +110,7 @@ func _flag_row(id: String, mood: int) -> HBoxContainer:
 	row.add_child(mark)
 	var label := PixelLabel.new()
 	label.scale_px = 2
-	label.wrap_width = 240
+	label.wrap_width = 220
 	label.set_text("%s %s" % [SimData.NAMES[id], SimData.mood_text(mood)])
 	row.add_child(label)
 	return row

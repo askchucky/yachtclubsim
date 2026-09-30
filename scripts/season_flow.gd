@@ -41,10 +41,10 @@ func _build() -> void:
 	add_child(ui)
 	portrait = PortraitBox.new()
 	portrait.set_anchors_preset(Control.PRESET_TOP_LEFT)
-	portrait.offset_left = 756
-	portrait.offset_top = 4
-	portrait.offset_right = 1272
-	portrait.offset_bottom = 122
+	portrait.offset_left = 560
+	portrait.offset_top = 0
+	portrait.offset_right = 1276
+	portrait.offset_bottom = 66
 	portrait.clip_contents = true
 	portrait.z_index = 4
 	ui.add_child(portrait)
@@ -140,21 +140,11 @@ func _rebuild_choices() -> void:
 	_update_confirm()
 
 
-func _stack_height(holder: VBoxContainer) -> int:
-	var height := 0
-	var count := holder.get_child_count()
-	for child in holder.get_children():
-		height += int((child as Control).get_combined_minimum_size().y)
-	if count > 1:
-		height += 4 * (count - 1)
-	return height
-
-
 func _fit_choice_panel() -> void:
-	var blurb_h := int(blurb.get_combined_minimum_size().y)
-	var title_h := 16
-	var col_h := title_h + 4 + maxi(_stack_height(spend_box), _stack_height(politics_box))
-	var panel_h := blurb_h + 2 + col_h + 2 + 36 + 20
+	var box := choice_panel.get_child(0) as Control
+	var content := int(ceil(box.get_combined_minimum_size().y))
+	# Frame content margins are 6px top and bottom. No spare parchment below Confirm.
+	var panel_h := content + 12
 	choice_panel.offset_left = 712
 	choice_panel.offset_right = 1272
 	choice_panel.offset_bottom = 616
