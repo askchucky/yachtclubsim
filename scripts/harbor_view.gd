@@ -19,6 +19,11 @@ var tied: Array = []
 var clock := 0.0
 var shown_season := -1
 var wake_tex: Texture2D
+var flag: Sprite2D
+var flag_frames: Array = []
+var dog: Sprite2D
+var dog_frames: Array = []
+var gull_sprites: Array = []
 
 
 func _ready() -> void:
@@ -42,10 +47,13 @@ func _ready() -> void:
 	land.texture = land_frames[0]
 	world.add_child(water)
 	world.add_child(land)
+	boat_root.z_index = 3
+	people_root.z_index = 4
 	world.add_child(boat_root)
 	world.add_child(people_root)
 	_bulbs()
 	_people()
+	_critters()
 	wanted.scale_px = 1
 	wanted.ink = Color("fff8ea")
 	wanted.set_text("Wanted")
@@ -72,8 +80,26 @@ func _process(delta: float) -> void:
 		var base: Vector2 = people[id]["base"]
 		var phase := float(people[id]["phase"])
 		var frames: Array = people[id]["frames"]
-		body.texture = frames[int(clock * 2.5 + phase) % 2]
-		body.position = base + Vector2(sin(clock * 0.7 + phase) * 2.0, sin(clock * 2.0 + phase) * 0.6)
+		var route: Array = people[id]["wander"]
+		if route.size() >= 2:
+			body.position = _along(route, clock * 14.0 + phase * 6.0)
+			body.texture = frames[2 + int(clock * 6.0 + phase) % 4]
+		else:
+			body.texture = frames[int(clock * 2.2 + phase) % 2]
+			body.position = base + Vector2(sin(clock * 1.3 + phase) * 0.6, sin(clock * 2.0 + phase) * 0.7)
+	if flag != null and flag_frames.size() == 2:
+		flag.texture = flag_frames[int(clock * 3.0) % 2]
+	if dog != null and dog_frames.size() == 2:
+		dog.texture = dog_frames[int(clock * 2.0) % 2]
+		dog.position = dog.get_meta("base") + Vector2(sin(clock * 1.4) * 3.0, 0)
+	for gull in gull_sprites:
+		var sprite: Sprite2D = gull["sprite"]
+		var origin: Vector2 = gull["origin"]
+		var phase := float(gull["phase"])
+		var frames: Array = gull["frames"]
+		sprite.position = origin + Vector2(cos(clock * 0.7 + phase) * 22.0, sin(clock * 0.9 + phase) * 6.0)
+		sprite.texture = frames[int(clock * 5.0 + phase) % 2]
+		sprite.flip_h = cos(clock * 0.7 + phase) < 0.0
 
 
 func refresh(sim_state: YearSim) -> void:
@@ -109,42 +135,59 @@ func apply_boats(sim_state: YearSim) -> void:
 	for child in boat_root.get_children():
 		child.free()
 	tied.clear()
+	var cell := int(catalog.get("boat_cell", 28))
+	var kinds := 7
+	if catalog.has("boats"):
+		kinds = maxi(1, (catalog["boats"] as Array).size())
+	var ties: Array = catalog["ties"]
+	var filled := mini(sim.slips_filled, ties.size())
+	for i in filled:
+		var at: Array = ties[i]
+		var sprite := _boat_sprite(i % kinds, 3, cell)
+		sprite.position = Vector2(float(at[0]), float(at[1]))
+		sprite.flip_h = at.size() > 2 and int(at[2]) == 1
+		boat_root.add_child(sprite)
+		tied.append({"sprite": sprite, "base": sprite.position.y, "phase": float(i)})
 	var moving := sim.moving_count()
-	if moving == 0:
-		var count := mini(12, sim.slips_filled)
-		for i in count:
-			var at: Array = catalog["ties"][i % catalog["ties"].size()]
-			var sprite := _boat_sprite(i, true)
-			sprite.position = Vector2(float(at[0]), float(at[1]))
-			sprite.flip_h = i % 2 == 0
-			boat_root.add_child(sprite)
-			tied.append({"sprite": sprite, "base": sprite.position.y, "phase": float(i)})
+	if moving <= 0:
 		return
-	var paths := {
-		"out": _path(catalog["paths"]["out"]),
-		"in": _path(catalog["paths"]["in"]),
-		"loop": _path(catalog["paths"]["loop"]),
-		"stay": _path(catalog["paths"]["stay"]),
-	}
-	var keys := ["out", "in", "loop", "stay"]
+	var order := ["loop", "weave", "in", "out"]
+	var keys: Array = []
+	for key in order:
+		if catalog["paths"].has(key):
+			keys.append(key)
+	if keys.is_empty():
+		return
+	var paths := {}
+	var per := {}
+	for key in keys:
+		paths[key] = _path(catalog["paths"][key])
+		per[key] = 0
 	for i in moving:
+		per[keys[i % keys.size()]] += 1
+	var seen := {}
+	for key in keys:
+		seen[key] = 0
+	for i in moving:
+		var key: String = str(keys[i % keys.size()])
+		var slot: int = int(seen[key])
+		seen[key] = slot + 1
 		var boat := HarborBoat.new()
-		boat.sprite = _boat_sprite(i, false)
-		boat.sprite.centered = true
-		boat.sprite.position = Vector2(0, -6)
+		boat.cell = cell
+		boat.col = i % kinds
+		boat.sheet = sheets["boats"]
+		boat.sprite = _boat_sprite(boat.col, 0, cell)
+		boat.sprite.position = Vector2.ZERO
 		boat.add_child(boat.sprite)
-		if i % 4 != 3:
-			boat.wake = Sprite2D.new()
-			boat.wake.texture = wake_tex
-			boat.wake.centered = true
-			boat.wake.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-			boat.add_child(boat.wake)
-		boat.pace = 28.0 + float(i % 5) * 6.0
-		boat.moving = i % 4 != 3
-		paths[keys[i % 4]].add_child(boat)
-		var slot := int(i / 4)
-		var per_path := maxi(1, int((moving + 3) / 4))
-		boat.progress_ratio = (float(slot) + 0.5) / float(per_path)
+		boat.wake = Sprite2D.new()
+		boat.wake.texture = wake_tex
+		boat.wake.centered = true
+		boat.wake.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		boat.add_child(boat.wake)
+		boat.pace = 20.0 + float((i * 3) % 5) * 3.0
+		boat.moving = true
+		paths[key].add_child(boat)
+		boat.progress_ratio = (float(slot) + 0.5) / float(maxi(1, int(per[key])))
 
 
 func pop_moods() -> void:
@@ -186,7 +229,9 @@ func _people() -> void:
 		body.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		body.texture = _person_tex(i, 0)
 		body.position = base
-		var frames := [_person_tex(i, 0), _person_tex(i, 1)]
+		var frames: Array = []
+		for frame in 6:
+			frames.append(_person_tex(i, frame))
 		body.set_meta("frames", frames)
 		var shadow := Sprite2D.new()
 		shadow.texture = sheets["shadow"]
@@ -207,12 +252,26 @@ func _people() -> void:
 		label.plate = Color(0.1, 0.06, 0.03, 0.82)
 		label.wrap_width = 160
 		label.set_text(SimData.NAMES[id])
-		var below := base.y > 150.0
-		var name_w := label.custom_minimum_size.x
-		label.position = base * int(catalog["scale"]) + Vector2(8 - name_w * 0.5, 68 if below else -20)
+		if catalog.has("label_pos") and (catalog["label_pos"] as Dictionary).has(id):
+			var spot: Array = catalog["label_pos"][id]
+			label.position = Vector2(float(spot[0]), float(spot[1]))
+		else:
+			var name_w := label.custom_minimum_size.x
+			label.position = base * int(catalog["scale"]) + Vector2(8 - name_w * 0.5, -20)
 		label.z_index = 6
 		label_root.add_child(label)
-		people[id] = {"sprite": body, "mood": mood, "base": base, "phase": float(i), "frames": frames}
+		var route: Array = []
+		if catalog.has("wander") and catalog["wander"].has(id):
+			route = catalog["wander"][id].duplicate()
+			if route.size() > 2:
+				var first: Array = route[0]
+				var last: Array = route[route.size() - 1]
+				if int(first[0]) != int(last[0]) or int(first[1]) != int(last[1]):
+					route.append(first)
+		people[id] = {
+			"sprite": body, "mood": mood, "base": base, "phase": float(i),
+			"frames": frames, "wander": route,
+		}
 
 
 func _bulbs() -> void:
@@ -232,17 +291,17 @@ func _person_tex(index: int, frame: int) -> AtlasTexture:
 	return _region(sheets["people"], Rect2(index * 16, frame * 32, 16, 32))
 
 
-func _boat_sprite(index: int, moored: bool) -> Sprite2D:
+func _boat_sprite(col: int, row: int, cell: int) -> Sprite2D:
 	var sprite := Sprite2D.new()
 	sprite.centered = true
 	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	var col := index % 7
-	sprite.texture = _region(sheets["boats"], Rect2(col * 48, 28 if moored else 0, 48, 28))
+	sprite.texture = _region(sheets["boats"], Rect2(col * cell, row * cell, cell, cell))
 	sprite.z_index = 3
 	var shadow := Sprite2D.new()
 	shadow.texture = sheets["shadow"]
 	shadow.centered = true
-	shadow.position = Vector2(0, 10)
+	shadow.position = Vector2(0, 8 if row == 3 else 10)
+	shadow.scale = Vector2(1.15, 0.8) if row == 3 else Vector2.ONE
 	shadow.z_index = -1
 	shadow.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	sprite.add_child(shadow)
@@ -263,6 +322,85 @@ func _region(sheet: Texture2D, rect: Rect2) -> AtlasTexture:
 	atlas.region = rect
 	atlas.filter_clip = true
 	return atlas
+
+
+func _critters() -> void:
+	var flag_tex: Texture2D = load("res://art/flag.png")
+	var flag_w := 14
+	var flag_h := 12
+	if catalog.has("flag_size"):
+		var flag_size: Array = catalog["flag_size"]
+		flag_w = int(flag_size[0])
+		flag_h = int(flag_size[1])
+	flag_frames = [
+		_region(flag_tex, Rect2(0, 0, flag_w, flag_h)),
+		_region(flag_tex, Rect2(0, flag_h, flag_w, flag_h)),
+	]
+	flag = Sprite2D.new()
+	flag.centered = false
+	flag.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	flag.texture = flag_frames[0]
+	flag.z_index = 5
+	var flag_at: Array = catalog.get("flag", [103, 0])
+	flag.position = Vector2(float(flag_at[0]), float(flag_at[1]))
+	world.add_child(flag)
+	var dog_tex: Texture2D = load("res://art/dog.png")
+	dog_frames = [
+		_region(dog_tex, Rect2(0, 0, 16, 12)),
+		_region(dog_tex, Rect2(0, 12, 16, 12)),
+	]
+	dog = Sprite2D.new()
+	dog.centered = false
+	dog.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	dog.texture = dog_frames[0]
+	dog.z_index = 4
+	var dog_at: Array = catalog.get("dog", [6, 292])
+	dog.position = Vector2(float(dog_at[0]), float(dog_at[1]))
+	dog.set_meta("base", dog.position)
+	world.add_child(dog)
+	var gull_tex: Texture2D = load("res://art/gull.png")
+	var gull_frames := [
+		_region(gull_tex, Rect2(0, 0, 10, 8)),
+		_region(gull_tex, Rect2(0, 8, 10, 8)),
+	]
+	var spots: Array = catalog.get("gulls", [])
+	for i in spots.size():
+		var gull := Sprite2D.new()
+		gull.centered = true
+		gull.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		gull.texture = gull_frames[0]
+		gull.z_index = 5
+		var spot: Array = spots[i]
+		gull.position = Vector2(float(spot[0]), float(spot[1]))
+		world.add_child(gull)
+		gull_sprites.append({
+			"sprite": gull,
+			"origin": gull.position,
+			"phase": float(i) * 1.7,
+			"frames": gull_frames,
+		})
+
+
+func _along(points: Array, dist: float) -> Vector2:
+	var total := 0.0
+	var lengths: Array = []
+	for i in range(points.size() - 1):
+		var a := Vector2(float(points[i][0]), float(points[i][1]))
+		var b := Vector2(float(points[i + 1][0]), float(points[i + 1][1]))
+		var span := a.distance_to(b)
+		lengths.append(span)
+		total += span
+	if total < 1.0:
+		return Vector2(float(points[0][0]), float(points[0][1]))
+	var walk := fposmod(dist, total)
+	for i in lengths.size():
+		var span := float(lengths[i])
+		if walk <= span:
+			var a := Vector2(float(points[i][0]), float(points[i][1]))
+			var b := Vector2(float(points[i + 1][0]), float(points[i + 1][1]))
+			return a.lerp(b, walk / maxf(0.001, span))
+		walk -= span
+	return Vector2(float(points[0][0]), float(points[0][1]))
 
 
 func _path(points: Array) -> Path2D:

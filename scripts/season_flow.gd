@@ -72,11 +72,11 @@ func _build() -> void:
 
 
 func _build_choices() -> void:
-	choice_panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
-	choice_panel.offset_left = 688
-	choice_panel.offset_top = 348
-	choice_panel.offset_right = 1272
-	choice_panel.offset_bottom = 608
+	choice_panel.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	choice_panel.offset_left = -568
+	choice_panel.offset_top = -320
+	choice_panel.offset_right = -8
+	choice_panel.offset_bottom = -104
 	choice_panel.clip_contents = true
 	choice_panel.z_index = 4
 	choice_panel.add_theme_stylebox_override("panel", UiSkin.frame(false))
@@ -84,10 +84,10 @@ func _build_choices() -> void:
 	box.add_theme_constant_override("separation", 2)
 	choice_panel.add_child(box)
 	blurb.scale_px = 2
-	blurb.wrap_width = 560
+	blurb.wrap_width = 520
 	box.add_child(blurb)
 	var columns := HBoxContainer.new()
-	columns.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	columns.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	columns.add_theme_constant_override("separation", 8)
 	box.add_child(columns)
 	columns.add_child(_column("Spend", spend_box))
@@ -136,7 +136,29 @@ func _rebuild_choices() -> void:
 		spend_box.add_child(_choice_button(str(item[0]), str(item[1]), spend_group))
 	for item in options["politics"]:
 		politics_box.add_child(_choice_button(str(item[0]), str(item[1]), politics_group))
+	_fit_choice_panel()
 	_update_confirm()
+
+
+func _stack_height(holder: VBoxContainer) -> int:
+	var height := 0
+	var count := holder.get_child_count()
+	for child in holder.get_children():
+		height += int((child as Control).get_minimum_size().y)
+	if count > 1:
+		height += 4 * (count - 1)
+	return height
+
+
+func _fit_choice_panel() -> void:
+	var blurb_h := int(blurb.get_minimum_size().y)
+	var title_h := 16
+	var col_h := title_h + 4 + maxi(_stack_height(spend_box), _stack_height(politics_box))
+	var panel_h := blurb_h + 2 + col_h + 2 + 36 + 16
+	choice_panel.offset_right = -8
+	choice_panel.offset_bottom = -104
+	choice_panel.offset_left = -568
+	choice_panel.offset_top = -104 - panel_h
 
 
 func _choice_button(id: String, text: String, group: ButtonGroup) -> Button:

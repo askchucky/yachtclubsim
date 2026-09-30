@@ -92,6 +92,13 @@ func set_die(face_index: int) -> void:
 func _flag_row(id: String, mood: int) -> HBoxContainer:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 6)
+	var face_mark := TextureRect.new()
+	face_mark.custom_minimum_size = Vector2(22, 22)
+	face_mark.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	face_mark.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	face_mark.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	face_mark.texture = _face_tex(id)
+	row.add_child(face_mark)
 	var mark := TextureRect.new()
 	mark.custom_minimum_size = Vector2(24, 24)
 	mark.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
